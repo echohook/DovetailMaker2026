@@ -1,0 +1,20 @@
+:root { color-scheme: dark; font-family: system-ui, "Microsoft JhengHei", sans-serif; }
+body { margin: 0; background: #202225; color: #edf0f4; font-size: 13px; }
+header { display:flex; align-items:center; gap:10px; padding:16px 20px 13px; background:#292d32; border-bottom:1px solid #3d424a; }
+.mark { font-size:31px; line-height:1; color:#49cf86; } h1 { margin:0; font-size:16px; } header p { margin:3px 0 0; color:#aeb7c2; font-size:11px; }
+.about-link { margin-left:auto; padding:5px 9px; background:transparent; color:#bfc7d0; border:1px solid #4b535d; font-size:12px; }
+main { padding: 16px 20px 18px; } .notice { min-height:19px; border-radius:5px; padding:9px 10px; color:#cbd4dc; background:#2c333b; margin-bottom:13px; }
+.notice.error { background:#4a292b; color:#ffc7c7; } label { display:flex; align-items:center; justify-content:space-between; margin: 9px 0; gap:18px; }
+input, select { box-sizing:border-box; width:138px; background:#15181b; color:#f2f4f6; border:1px solid #4b535d; border-radius:4px; padding:7px 8px; font:inherit; }
+.metrics { margin-top:15px; border:1px solid #3d444d; border-radius:6px; overflow:hidden; } .metrics div { display:flex; justify-content:space-between; padding:8px 10px; border-bottom:1px solid #343a42; } .metrics div:last-child { border:0; } .metrics span { color:#aeb7c2; } output { color:#58d990; font-variant-numeric:tabular-nums; }
+.hint { color:#bfc7d0; font-size:12px; margin:13px 0; } footer { display:flex; align-items:center; gap:7px; margin-top:15px; } .spacer { flex:1; }
+button { border:0; border-radius:4px; padding:8px 11px; background:#37b970; color:#092414; font:inherit; font-weight:600; cursor:pointer; } button:disabled { opacity:.45; cursor:not-allowed; } button.secondary { background:#3a414a; color:#eef2f5; }
+.about-card h2 { margin:0 0 10px; font-size:17px; }
+.about-summary { color:#c5cdd5; line-height:1.55; margin:0 0 14px; }
+.about-card dl { margin:0; border:1px solid #3d444d; border-radius:6px; overflow:hidden; }
+.about-card dl div { display:flex; justify-content:space-between; gap:14px; padding:8px 10px; border-bottom:1px solid #343a42; }
+.about-card dl div:last-child { border-bottom:0; }
+.about-card dt { color:#aeb7c2; } .about-card dd { margin:0; text-align:right; }
+.about-card a { color:#58d990; text-decoration:none; }
+.copyright { color:#8f99a4; font-size:11px; margin:14px 0 0; }
+.about-footer { justify-content:flex-end; margin-top:14px; }
