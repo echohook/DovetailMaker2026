@@ -25,6 +25,8 @@ module DovetailMaker2026
       @tail_instance = nil
       @current_board = nil
       @preview_result = nil
+      @first_tail_result = nil
+      @opposite_tail_board = nil
       @other_tail_created = false
       @create_other_tail = false
     end
@@ -33,6 +35,8 @@ module DovetailMaker2026
       @tail_instance = BoardDetector.validate_selection!(@model.selection)
       @phase = :tail
       @tail_layout = nil
+      @first_tail_result = nil
+      @opposite_tail_board = nil
       @other_tail_created = false
       @create_other_tail = false
       @current_board = BoardDetector.auto_detect(@tail_instance)
@@ -142,6 +146,12 @@ module DovetailMaker2026
       opposite = BoardDetector.opposite_end(@tail_instance, @current_board.face, @settings[:thickness])
       @opposite_tail_center = opposite.face.bounds.center.transform(opposite.instance.transformation)
       @opposite_tail_width = opposite.width
+      # Keep the already validated opposite-end coordinate system. Searching
+      # the geometry again after the first cut is unreliable because the new
+      # dovetail shoulders also look like rectangular joint faces.
+      @opposite_tail_board = opposite
+      @first_tail_result = @preview_result
+      @first_tail_flipped = @settings[:flipped]
       TailCutter.cut(@current_board, @preview_result)
       @tail_board = @current_board
       @tail_instance = @current_board.instance
@@ -205,20 +215,23 @@ module DovetailMaker2026
     private
 
     def create_other_tail!
-      unless @tail_instance && @opposite_tail_center && @opposite_tail_width && @tail_layout
+      unless @tail_instance && @opposite_tail_board && @first_tail_result && @tail_layout
         raise ArgumentError, '請先建立第一端 Tail。'
       end
 
       first_layout = @tail_layout
-      board = BoardDetector.auto_detect_near(@tail_instance, @opposite_tail_center, @settings[:thickness],
-                                             expected_width: @opposite_tail_width)
+      board = @opposite_tail_board
+      first_result = @first_tail_result
       # The opposite end must be mirrored across the board width. Reversing the
       # layout also swaps the left/right half-pin treatment, producing a true
       # visual mirror rather than a second copy with the same handedness.
-      result = GeometryCalculator.calculate(width: board.width, thickness: @settings[:thickness],
-                                            tail_count: @settings[:tail_count], slope: @settings[:slope],
-                                            left_pin: @settings[:left_pin], right_pin: @settings[:right_pin],
-                                            flipped: !@settings[:flipped])
+      # Reuse the exact values that already produced the first Tail. This
+      # prevents later UI state or post-cut face dimensions from changing the
+      # second-end layout.
+      result = GeometryCalculator.calculate(width: first_result.width, thickness: first_result.thickness,
+                                            tail_count: first_result.tail_count, slope: first_result.slope,
+                                            left_pin: first_result.left_pin, right_pin: first_result.right_pin,
+                                            flipped: !@first_tail_flipped)
       TailCutter.cut(board, result)
       # The second cut writes its own layout attribute. Keep the first joint as
       # the authoritative Tail profile used for the already-created Pin Board.

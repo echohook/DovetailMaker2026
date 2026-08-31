@@ -2,8 +2,8 @@
 
 module DovetailMaker2026
   module Settings
-    VERSION = '1.2.8'
-    RELEASE_DATE = '2026-08-31'
+    VERSION = '1.2.9'
+    RELEASE_DATE = '2026-09-01'
     CREATOR = 'James Hook'
     EMAIL = 'dark.hook@gmail.com'
     SLOPES = [4, 5, 6, 7, 8].freeze
