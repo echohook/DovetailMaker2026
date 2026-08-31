@@ -26,6 +26,7 @@ module DovetailMaker2026
       @current_board = nil
       @preview_result = nil
       @other_tail_created = false
+      @create_other_tail = false
     end
 
     def start
@@ -33,6 +34,7 @@ module DovetailMaker2026
       @phase = :tail
       @tail_layout = nil
       @other_tail_created = false
+      @create_other_tail = false
       @current_board = BoardDetector.auto_detect(@tail_instance)
       @settings[:thickness] = @current_board.actual_thickness
       recalculate
@@ -131,24 +133,6 @@ module DovetailMaker2026
       Sketchup.active_model.active_view.invalidate
     end
 
-    def switch_end(json = nil)
-      apply_parameters!(json) if json
-      raise ArgumentError, 'E006|目前沒有可切換的加工端面。' unless @current_board
-      candidate_board = BoardDetector.opposite_end(@tail_instance, @current_board.face, @settings[:thickness])
-      candidate_result = GeometryCalculator.calculate(width: candidate_board.width, thickness: @settings[:thickness],
-                                                      tail_count: @settings[:tail_count], slope: @settings[:slope],
-                                                      left_pin: @settings[:left_pin], right_pin: @settings[:right_pin],
-                                                      flipped: @settings[:flipped])
-      @current_board = candidate_board
-      @preview_result = candidate_result
-      Sketchup.active_model.active_view.invalidate
-      # The user explicitly chose the opposite end. The current validated
-      # settings are applied immediately; no second confirmation is required.
-      create_tail
-    rescue StandardError => e
-      UI.messagebox(e.message.split('|', 2).last)
-    end
-
     def create_tail(json = nil)
       apply_parameters!(json) if json
       raise ArgumentError, '請先選取加工端面並輸入有效參數。' unless @current_board && @preview_result
@@ -164,41 +148,22 @@ module DovetailMaker2026
       @phase = :pin
       @current_board = nil
       @preview_result = nil
-      @dialog.send_state(phase: 'select_pin', other_tail_created: false,
-                         message: 'Tail 已建立。可在另一端建立相同 Tail，或直接點選 Pin Board。')
+      send_state(message: 'Tail 已建立。可勾選在完成時建立另一端的鏡像 Tail，或直接點選 Pin Board。')
       @model.select_tool(DovetailTool.new(self, :pin))
     rescue StandardError => e
       UI.messagebox(e.message.split('|', 2).last)
     end
 
-    def create_other_tail
-      raise ArgumentError, '請先建立第一端 Tail。' unless @phase == :pin && @tail_instance && @opposite_tail_center
-      return if @other_tail_created
-
-      first_layout = @tail_layout
-      board = BoardDetector.auto_detect_near(@tail_instance, @opposite_tail_center, @settings[:thickness])
-      result = GeometryCalculator.calculate(width: board.width, thickness: @settings[:thickness],
-                                            tail_count: @settings[:tail_count], slope: @settings[:slope],
-                                            left_pin: @settings[:left_pin], right_pin: @settings[:right_pin],
-                                            flipped: @settings[:flipped])
-      TailCutter.cut(board, result)
-      # The second cut writes its own layout attribute. Restore the first joint
-      # as the authoritative source for the Pin Board selected next.
-      @tail_instance.set_attribute(Settings::DICTIONARY, 'tail_layout', JSON.generate(first_layout))
-      @tail_layout = first_layout
-      @other_tail_created = true
-      @dialog.send_state(phase: 'select_pin', other_tail_created: true,
-                         message: '另一端相同 Tail 已建立。請直接點選 Pin Board。')
-      @model.active_view.invalidate
-    rescue StandardError => e
-      UI.messagebox(e.message.split('|', 2).last)
+    def set_create_other_tail(enabled)
+      @create_other_tail = enabled == true || enabled.to_s == 'true'
+      send_state
     end
 
     def create_pin
       raise ArgumentError, '請先選取 Pin Board 端面。' unless @pin_board && @tail_layout
       PinCutter.cut(@pin_board, @tail_layout)
       @phase = :complete
-      @dialog.send_state(phase: 'complete', message: 'Tail 與 Pin 已完成。')
+      send_state(message: 'Tail 與 Pin 已完成。按完成後可依勾選建立另一端的鏡像 Tail。')
       @model.select_tool(nil)
     rescue StandardError => e
       UI.messagebox(e.message.split('|', 2).last)
@@ -211,24 +176,24 @@ module DovetailMaker2026
       nil
     end
 
-    def cancel
-      @model.select_tool(nil)
-      @dialog.close
-    end
-
     def finish
+      create_other_tail! if @create_other_tail && !@other_tail_created
       @model.select_tool(nil)
       @dialog.close
+    rescue StandardError => e
+      UI.messagebox(e.message.split('|', 2).last)
     end
 
     def dialog_closed
       @model.select_tool(nil)
     end
 
-    def send_state(error: nil)
+    def send_state(error: nil, message: nil)
       state = { phase: @phase.to_s, error: error, values: printable_values,
+                create_other_tail: @create_other_tail, other_tail_created: @other_tail_created,
                 about: { version: Settings::VERSION, release_date: Settings::RELEASE_DATE,
                          creator: Settings::CREATOR, email: Settings::EMAIL } }
+      state[:message] = message if message
       if @preview_result
         state[:metrics] = { width: format_length(@preview_result.width), full_pin: format_length(@preview_result.full_pin),
                             tail_width: format_length(@preview_result.tail_width), narrow_width: format_length(@preview_result.narrow_width) }
@@ -237,6 +202,27 @@ module DovetailMaker2026
     end
 
     private
+
+    def create_other_tail!
+      raise ArgumentError, '請先建立第一端 Tail。' unless @tail_instance && @opposite_tail_center && @tail_layout
+
+      first_layout = @tail_layout
+      board = BoardDetector.auto_detect_near(@tail_instance, @opposite_tail_center, @settings[:thickness])
+      # The opposite end must be mirrored across the board width. Reversing the
+      # layout also swaps the left/right half-pin treatment, producing a true
+      # visual mirror rather than a second copy with the same handedness.
+      result = GeometryCalculator.calculate(width: board.width, thickness: @settings[:thickness],
+                                            tail_count: @settings[:tail_count], slope: @settings[:slope],
+                                            left_pin: @settings[:left_pin], right_pin: @settings[:right_pin],
+                                            flipped: !@settings[:flipped])
+      TailCutter.cut(board, result)
+      # The second cut writes its own layout attribute. Keep the first joint as
+      # the authoritative Tail profile used for the already-created Pin Board.
+      @tail_instance.set_attribute(Settings::DICTIONARY, 'tail_layout', JSON.generate(first_layout))
+      @tail_layout = first_layout
+      @other_tail_created = true
+      @model.active_view.invalidate
+    end
 
     def ensure_face_belongs!(face, path, instance)
       return if face.parent == BoardDetector.entities_for(instance)
@@ -293,6 +279,8 @@ module DovetailMaker2026
     toolbar = UI::Toolbar.new('Dovetail Maker 2026')
     command = UI::Command.new('Dovetail Maker 2026') { Controller.new.start }
     command.tooltip = 'Create through dovetails (Tail First)'
+    command.small_icon = File.join(__dir__, 'ui', 'icons', 'dovetail-maker-24.png')
+    command.large_icon = File.join(__dir__, 'ui', 'icons', 'dovetail-maker-32.png')
     toolbar.add_item(command)
     toolbar.restore
     file_loaded(__FILE__)

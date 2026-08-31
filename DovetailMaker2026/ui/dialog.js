@@ -34,11 +34,7 @@
   }
   fields.forEach(id => $(id).addEventListener('input', update));
   $('flip').onclick = () => window.sketchup.flip(latestPayload());
-  $('switch_end').onclick = () => {
-    if (phase === 'select_pin') window.sketchup.create_other_tail();
-    else window.sketchup.switch_end(latestPayload());
-  };
-  $('cancel').onclick = () => window.sketchup.cancel();
+  $('other_tail').onchange = () => window.sketchup.set_create_other_tail($('other_tail').checked);
   $('create').onclick = () => {
     if (phase === 'complete') window.sketchup.finish();
     else if (phase === 'pin') window.sketchup.create_pin();
@@ -61,23 +57,23 @@
         $('about_date').textContent = state.about.release_date;
       }
       if (state.phase) phase = state.phase;
+      if (state.create_other_tail !== undefined) $('other_tail').checked = !!state.create_other_tail;
+      $('other_tail').disabled = !!state.other_tail_created;
       setMetrics(state.metrics);
       if (state.error) { setNotice(state.error, true); $('create').disabled = true; return; }
       if (phase === 'select_pin') {
         $('parameters').hidden = true; $('flip').hidden = true;
-        $('switch_end').textContent = '另一端建立相同 Tail';
-        $('switch_end').hidden = !!state.other_tail_created;
+        $('other_tail_option').hidden = false;
         $('create').disabled = true;
         setNotice(state.message || '請直接點選 Pin Board 的對應端面。');
       } else if (phase === 'pin') {
-        $('parameters').hidden = true; $('flip').hidden = true; $('switch_end').hidden = true; $('create').textContent = '建立 Pin'; $('create').disabled = false;
+        $('parameters').hidden = true; $('flip').hidden = true; $('other_tail_option').hidden = false; $('create').textContent = '建立 Pin'; $('create').disabled = false;
         setNotice('已取得 Tail 實際輪廓。確認後建立互補 Pin。');
       } else if (phase === 'complete') {
         $('parameters').hidden = true; $('create').textContent = '完成'; $('create').disabled = false;
-        $('flip').hidden = true; $('switch_end').hidden = true; setNotice(state.message || 'Tail 與 Pin 已完成。');
+        $('flip').hidden = true; $('other_tail_option').hidden = false; setNotice(state.message || 'Tail 與 Pin 已完成。');
       } else {
-        $('parameters').hidden = false; $('flip').hidden = false; $('switch_end').hidden = false;
-        $('switch_end').textContent = '另一端直接建立';
+        $('parameters').hidden = false; $('flip').hidden = false; $('other_tail_option').hidden = true;
         $('create').textContent = '建立 Tail'; $('create').disabled = !state.metrics;
         $('direction').textContent = state.values?.flipped ? '排列方向：RIGHT → LEFT' : '排列方向：LEFT → RIGHT';
         setNotice('調整參數後，模型視窗會即時更新預覽。');

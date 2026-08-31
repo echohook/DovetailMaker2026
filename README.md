@@ -41,7 +41,7 @@
 ## 支援環境
 
 - **SketchUp 2026 Pro**
-- V1 版本：**1.2.6**
+- V1 版本：**1.2.7**
 - 發布日期：**2026-08-31**
 - Clearance：**0 mm**
 
@@ -106,7 +106,7 @@ Dovetail Maker 2026 的目標不是取代木工技術，而是減少 SketchUp �
 ## 專案資訊
 
 - 創作者：James Hook
-- Version：1.2.6
+- Version：1.2.7
 - Platform：SketchUp 2026 Pro
 - Language：Ruby / SketchUp Ruby API
 

@@ -14,12 +14,10 @@ module DovetailMaker2026
       @dialog.add_action_callback('ready') { |_ctx| @controller.dialog_ready }
       @dialog.add_action_callback('update') { |_ctx, data| @controller.update_parameters(data) }
       @dialog.add_action_callback('flip') { |_ctx, data| @controller.flip(data) }
-      @dialog.add_action_callback('switch_end') { |_ctx, data| @controller.switch_end(data) }
-      @dialog.add_action_callback('create_other_tail') { |_ctx| @controller.create_other_tail }
+      @dialog.add_action_callback('set_create_other_tail') { |_ctx, enabled| @controller.set_create_other_tail(enabled) }
       @dialog.add_action_callback('create_tail') { |_ctx, data| @controller.create_tail(data) }
       @dialog.add_action_callback('create_pin') { |_ctx| @controller.create_pin }
       @dialog.add_action_callback('finish') { |_ctx| @controller.finish }
-      @dialog.add_action_callback('cancel') { |_ctx| @controller.cancel }
       @dialog.set_on_closed { @controller.dialog_closed }
       @dialog.show
     end
