@@ -2,7 +2,7 @@
 
 module DovetailMaker2026
   module Settings
-    VERSION = '1.2.9'
+    VERSION = '1.2.10'
     RELEASE_DATE = '2026-09-01'
     CREATOR = 'James Hook'
     EMAIL = 'dark.hook@gmail.com'

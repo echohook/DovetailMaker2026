@@ -13,7 +13,7 @@ module DovetailMaker2026
   unless file_loaded?(__FILE__)
     extension = SketchupExtension.new(EXTENSION_NAME, EXTENSION_PATH)
     extension.description = 'Creates through dovetails, tail first.'
-    extension.version = '1.2.9'
+    extension.version = '1.2.10'
     extension.creator = 'James Hook'
     extension.copyright = '2026'
     Sketchup.register_extension(extension, true)

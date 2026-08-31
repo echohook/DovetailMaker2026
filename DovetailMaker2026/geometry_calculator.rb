@@ -64,6 +64,35 @@ module DovetailMaker2026
                  tails: tails, wastes: wastes)
     end
 
+    # Mirror an already validated result without running width validation a
+    # second time. The opposite end must be geometrically identical to the
+    # first end; reflecting its coordinates is both safer and more exact than
+    # recalculating from UI values or post-cut faces.
+    def self.mirror(result)
+      width = result.width
+      tails = result.tails.reverse.each_with_index.map do |tail, index|
+        outer_left = width - tail[:outer_right]
+        outer_right = width - tail[:outer_left]
+        inner_left = width - tail[:inner_right]
+        inner_right = width - tail[:inner_left]
+        tail.merge(index: index + 1,
+                   outer_left: outer_left, outer_right: outer_right,
+                   inner_left: inner_left, inner_right: inner_right,
+                   polygon: [[outer_left, 0.0], [outer_right, 0.0],
+                             [inner_right, result.thickness], [inner_left, result.thickness]])
+      end
+      wastes = result.wastes.reverse.map do |polygon|
+        polygon.map { |x, y| [width - x, y] }.reverse
+      end
+
+      Result.new(width: width, thickness: result.thickness,
+                 tail_count: result.tail_count, slope: result.slope,
+                 left_pin: result.right_pin, right_pin: result.left_pin,
+                 full_pin: result.full_pin, tail_width: result.tail_width,
+                 narrow_width: result.narrow_width, offset: result.offset,
+                 tails: tails, wastes: wastes)
+    end
+
     def self.validate!(width, thickness, count, slope, left, right)
       raise ArgumentError, 'E204|板厚必須大於 0。' unless thickness > Settings::GEOMETRY_TOLERANCE
       raise ArgumentError, 'E201|Tail 數量至少必須為 1。' unless count.is_a?(Integer) && count >= 1
