@@ -66,12 +66,22 @@ module DovetailMaker2026
 
     # Select the board end closest to an existing joint in world coordinates.
     # Used for Pin Board so camera position cannot reverse the result.
-    def self.auto_detect_near(instance, world_point, thickness)
+    def self.auto_detect_near(instance, world_point, thickness, expected_width: nil)
       # Do not assume the end face is the smallest face. A wide, short board
       # has side faces smaller than its actual width x thickness joint face.
       # Every valid joint face has one edge equal to the board thickness; the
       # face nearest the completed Tail joint is the intended mating end.
       faces = rectangular_joint_faces(instance, thickness)
+      if expected_width
+        width_tolerance = [Settings::GEOMETRY_TOLERANCE * 10, expected_width * 0.01].max
+        faces.select! do |candidate|
+          dimensions = face_dimensions(candidate)
+          dimensions.length == 2 && (dimensions.max - expected_width).abs <= width_tolerance
+        end
+        if faces.empty?
+          raise ArgumentError, 'E007|找不到與第一端同寬的完整另一端加工面，請確認板件仍為封閉實體。'
+        end
+      end
       transformation = instance.transformation
       face = faces.min_by do |candidate|
         world_point.distance(candidate.bounds.center.transform(transformation))

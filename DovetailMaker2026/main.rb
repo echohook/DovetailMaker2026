@@ -141,6 +141,7 @@ module DovetailMaker2026
       @tail_joint_center = @current_board.face.bounds.center.transform(@current_board.instance.transformation)
       opposite = BoardDetector.opposite_end(@tail_instance, @current_board.face, @settings[:thickness])
       @opposite_tail_center = opposite.face.bounds.center.transform(opposite.instance.transformation)
+      @opposite_tail_width = opposite.width
       TailCutter.cut(@current_board, @preview_result)
       @tail_board = @current_board
       @tail_instance = @current_board.instance
@@ -204,10 +205,13 @@ module DovetailMaker2026
     private
 
     def create_other_tail!
-      raise ArgumentError, '請先建立第一端 Tail。' unless @tail_instance && @opposite_tail_center && @tail_layout
+      unless @tail_instance && @opposite_tail_center && @opposite_tail_width && @tail_layout
+        raise ArgumentError, '請先建立第一端 Tail。'
+      end
 
       first_layout = @tail_layout
-      board = BoardDetector.auto_detect_near(@tail_instance, @opposite_tail_center, @settings[:thickness])
+      board = BoardDetector.auto_detect_near(@tail_instance, @opposite_tail_center, @settings[:thickness],
+                                             expected_width: @opposite_tail_width)
       # The opposite end must be mirrored across the board width. Reversing the
       # layout also swaps the left/right half-pin treatment, producing a true
       # visual mirror rather than a second copy with the same handedness.
