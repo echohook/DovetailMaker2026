@@ -39,8 +39,8 @@ Install the RBZ directly through SketchUp Extension Manager. Do not extract it f
 ## Requirements
 
 - SketchUp 2026 Pro
-- Version: 1.2.6
-- Release date: 2026-08-31
+- Version: 1.2.11
+- Release date: 2026-09-08
 - Clearance: 0 mm in V1
 
 ## Installation
@@ -60,7 +60,7 @@ Install the RBZ directly through SketchUp Extension Manager. Do not extract it f
 4. Set board thickness, tail count, dovetail slope, left half pin, and right half pin.
 5. Check the live preview and use **Flip** when needed.
 6. Click **Create Tail**.
-7. Optionally create the same tail pattern on the opposite end.
+7. Optionally check the option to create mirrored tails on the opposite end when finishing.
 8. Select the matching Pin Board face.
 9. Check the pin preview and click **Create Pin**.
 10. Finish the operation.
@@ -98,7 +98,7 @@ When reporting a problem, include your SketchUp version, Dovetail Maker version,
 ## Project Information
 
 - Creator: James Hook
-- Version: 1.2.6
+- Version: 1.2.11
 - Platform: SketchUp 2026 Pro
 - Language: Ruby / SketchUp Ruby API
 

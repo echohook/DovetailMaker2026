@@ -106,7 +106,11 @@ module DovetailMaker2026
       faces = entities_for(instance).grep(Sketchup::Face).select do |face|
         face.outer_loop.vertices.length == 4 && face.loops.length == 1
       end
-      raise ArgumentError, 'E005|選取的物件不是可辨識的矩形實體板。' if faces.length < 6
+      # New Tail layout is only valid on an uncut rectangular board. Never use
+      # a small existing pin/tail shoulder as a new board's full width.
+      unless faces.length == 6 && entities_for(instance).grep(Sketchup::Face).length == 6
+        raise ArgumentError, 'E005|此板已加工或不是矩形板；要建立 Pin，請先選取已完成 Tail 的板材再啟動。'
+      end
       minimum_area = faces.map(&:area).min
       tolerance = [minimum_area * 0.01, Settings::MIN_FACE_AREA].max
       result = faces.select { |face| (face.area - minimum_area).abs <= tolerance }

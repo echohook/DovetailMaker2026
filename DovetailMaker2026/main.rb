@@ -9,6 +9,7 @@ module DovetailMaker2026
   require File.join(__dir__, 'board_detector')
   require File.join(__dir__, 'tail_cutter')
   require File.join(__dir__, 'pin_cutter')
+  require File.join(__dir__, 'tail_joints')
   require File.join(__dir__, 'dovetail_tool')
   require File.join(__dir__, 'dialog')
 
@@ -39,6 +40,19 @@ module DovetailMaker2026
       @opposite_tail_board = nil
       @other_tail_created = false
       @create_other_tail = false
+      @resuming = false
+      @pin_board = nil
+      @current_board = nil
+      @preview_result = nil
+      if TailJoints.available?(@tail_instance)
+        @tail_layouts = TailJoints.read(@tail_instance)
+        @settings[:thickness] = @tail_layouts.first.fetch('thickness').to_f
+        @resuming = true
+        @phase = :select_pin
+        @model.select_tool(DovetailTool.new(self, :pin))
+        @dialog.show
+        return
+      end
       @current_board = BoardDetector.auto_detect(@tail_instance)
       @settings[:thickness] = @current_board.actual_thickness
       recalculate
@@ -53,52 +67,45 @@ module DovetailMaker2026
     end
 
     def face_clicked(face, path, phase)
-      instance = if phase == :tail
-                   @tail_instance
-                 else
-                   instance_from_pick_path(path) || BoardDetector.validate_selection!(@model.selection)
-                 end
-      if phase == :pin && instance == @tail_instance
-        raise ArgumentError, 'E104|請點選另一塊板材作為 Pin Board，不可再次選擇 Tail Board。'
+      if phase == :pin
+        pin_board_clicked(instance_from_pick_path(path))
+        return
       end
+      instance = @tail_instance
       ensure_face_belongs!(face, path, instance)
       @current_board = BoardDetector.detect(instance, face, @settings[:thickness], path)
-      if phase == :tail
-        recalculate
-        @dialog.show
-        send_state
-      else
-        @pin_board = @current_board
-        @model.selection.clear
-        @model.selection.add(@pin_board.instance)
-        @tail_layout ||= PinCutter.read_tail_layout(@tail_instance)
-        @dialog.show
-        send_state
-      end
+      recalculate
+      @dialog.show
+      send_state
     rescue ArgumentError => e
       UI.messagebox(e.message.split('|', 2).last)
     end
 
     def pin_board_clicked(instance)
+      @pin_board = nil
+      @current_board = nil
+      @phase = :select_pin
       unless instance.is_a?(Sketchup::Group) || instance.is_a?(Sketchup::ComponentInstance)
         raise ArgumentError, 'E003|Pin Board 必須是 Group 或 Component。'
       end
       raise ArgumentError, 'E004|選取的 Pin Board 已鎖定。' if instance.locked?
       raise ArgumentError, 'E104|請點選另一塊板材作為 Pin Board。' if instance == @tail_instance
 
-      @pin_board = BoardDetector.auto_detect_near(instance, @tail_joint_center, @settings[:thickness])
-      validate_board_relationship!(@tail_board, @pin_board)
+      layouts = TailJoints.read(@tail_instance)
+      @pin_board, @tail_layout = PinCutter.match_joint(instance, layouts)
       @current_board = @pin_board
-      @tail_layout ||= PinCutter.read_tail_layout(@tail_instance)
+      @phase = :pin
       @model.selection.clear
       @model.selection.add(instance)
       send_state
       @model.active_view.invalidate
     rescue StandardError => e
+      send_state(error: e.message.split('|', 2).last)
       UI.messagebox(e.message.split('|', 2).last)
     end
 
     def update_parameters(json)
+      return unless @phase == :tail
       apply_parameters!(json)
       send_state
     rescue StandardError => e
@@ -109,6 +116,7 @@ module DovetailMaker2026
     end
 
     def apply_parameters!(json)
+      raise ArgumentError, '既有 Tail 請直接選取 Pin Board。' unless @phase == :tail
       data = JSON.parse(json)
       # Parse into locals first. A temporarily empty/invalid field must not
       # corrupt the last valid settings while the user is still typing.
@@ -153,7 +161,7 @@ module DovetailMaker2026
       @tail_board = @current_board
       @tail_instance = @current_board.instance
       @tail_layout = PinCutter.read_tail_layout(@tail_instance)
-      @phase = :pin
+      @phase = :select_pin
       @current_board = nil
       @preview_result = nil
       send_state(message: 'Tail 已建立。可勾選在完成時建立另一端的鏡像 Tail，或直接點選 Pin Board。')
@@ -168,10 +176,12 @@ module DovetailMaker2026
     end
 
     def create_pin
-      raise ArgumentError, '請先選取 Pin Board 端面。' unless @pin_board && @tail_layout
+      raise ArgumentError, '請先選取 Pin Board 端面。' unless @phase == :pin && @pin_board && @tail_layout
+      # Revalidate after Undo, moves or edits made while the dialog was open.
+      @pin_board, @tail_layout = PinCutter.match_joint(@pin_board.instance, TailJoints.read(@tail_instance))
       PinCutter.cut(@pin_board, @tail_layout)
       @phase = :complete
-      send_state(message: 'Tail 與 Pin 已完成。按完成後可依勾選建立另一端的鏡像 Tail。')
+      send_state(message: 'Tail 與 Pin 已完成。')
       @model.select_tool(nil)
     rescue StandardError => e
       UI.messagebox(e.message.split('|', 2).last)
@@ -198,10 +208,14 @@ module DovetailMaker2026
 
     def send_state(error: nil, message: nil)
       state = { phase: @phase.to_s, error: error, values: printable_values,
+                can_create_other_tail: !@resuming && !!@opposite_tail_board,
                 create_other_tail: @create_other_tail, other_tail_created: @other_tail_created,
                 about: { version: Settings::VERSION, release_date: Settings::RELEASE_DATE,
                          creator: Settings::CREATOR, email: Settings::EMAIL } }
       state[:message] = message if message
+      if @phase == :select_pin && !message
+        state[:message] = @resuming ? '已讀取既有 Tail。請點選要配合的 Pin 板，會自動對應最近的接合端。' : '請點選對應的 Pin 板。'
+      end
       if @preview_result
         state[:metrics] = { width: format_length(@preview_result.width), full_pin: format_length(@preview_result.full_pin),
                             tail_width: format_length(@preview_result.tail_width), narrow_width: format_length(@preview_result.narrow_width) }
@@ -223,9 +237,7 @@ module DovetailMaker2026
       # opposite end is not a new layout and must never fail width validation.
       result = GeometryCalculator.mirror(first_result)
       TailCutter.cut(board, result)
-      # The second cut writes its own layout attribute. Keep the first joint as
-      # the authoritative Tail profile used for the already-created Pin Board.
-      @tail_instance.set_attribute(Settings::DICTIONARY, 'tail_layout', JSON.generate(first_layout))
+      # Both ends are persisted by TailCutter within the cutting operation.
       @tail_layout = first_layout
       @other_tail_created = true
       @model.active_view.invalidate
@@ -237,18 +249,6 @@ module DovetailMaker2026
       # top-level and nested models. It avoids accepting an unrelated face.
       return if path && path.include?(instance)
       raise ArgumentError, 'E101|所選端面不屬於目前板件。'
-    end
-
-    def validate_board_relationship!(tail_board, pin_board)
-      tail_inward = tail_board.inward_axis.transform(tail_board.instance.transformation).normalize
-      tail_width = tail_board.x_axis.transform(tail_board.instance.transformation).normalize
-      tail_thickness = tail_board.z_axis.transform(tail_board.instance.transformation).normalize
-      pin_inward = pin_board.inward_axis.transform(pin_board.instance.transformation).normalize
-      pin_width = pin_board.x_axis.transform(pin_board.instance.transformation).normalize
-      correct_axes = tail_inward.dot(pin_inward).abs < 0.02 &&
-                     tail_thickness.dot(pin_inward).abs > 0.98 &&
-                     tail_width.dot(pin_width).abs > 0.98
-      raise ArgumentError, 'E105|無法辨識正確的 Pin 端面；兩塊板須以 90° 完成位置擺放。' unless correct_axes
     end
 
     def instance_from_pick_path(path)

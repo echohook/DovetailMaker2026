@@ -15,7 +15,16 @@ module DovetailMaker2026
         end
         # Attribute dictionaries persist primitive values reliably across SKP
         # saves. JSON also keeps this data independent of Ruby object lifetime.
-        board.instance.set_attribute(Settings::DICTIONARY, 'tail_layout', JSON.generate(serialize(board, result)))
+        layout = TailJoints.extract(board.instance, serialize(board, result))
+        raise RuntimeError, 'E302|切削後無法讀取完整 Tail 輪廓，已取消這次加工。' unless layout && layout['tails'].length == result.tail_count
+        saved = board.instance.get_attribute(Settings::DICTIONARY, 'tail_layouts')
+        layouts = saved ? JSON.parse(saved) : []
+        layouts.reject! { |old| old['origin'] == layout['origin'] && old['inward_axis'] == layout['inward_axis'] }
+        layouts << layout
+        board.instance.set_attribute(Settings::DICTIONARY, 'tail_layouts', JSON.generate(layouts))
+        unless board.instance.get_attribute(Settings::DICTIONARY, 'tail_layout')
+          board.instance.set_attribute(Settings::DICTIONARY, 'tail_layout', JSON.generate(layout))
+        end
         board.instance.set_attribute(Settings::DICTIONARY, 'phase', 'tails_complete')
         model.commit_operation
       rescue StandardError

@@ -57,21 +57,25 @@
         $('about_date').textContent = state.about.release_date;
       }
       if (state.phase) phase = state.phase;
+      if (phase !== 'tail') clearTimeout(updateTimer);
+      $('other_tail_option').hidden = !state.can_create_other_tail || phase === 'tail';
+      $('parameters').hidden = phase !== 'tail';
+      $('flip').hidden = phase !== 'tail';
       if (state.create_other_tail !== undefined) $('other_tail').checked = !!state.create_other_tail;
       $('other_tail').disabled = !!state.other_tail_created;
       setMetrics(state.metrics);
       if (state.error) { setNotice(state.error, true); $('create').disabled = true; return; }
       if (phase === 'select_pin') {
         $('parameters').hidden = true; $('flip').hidden = true;
-        $('other_tail_option').hidden = false;
+        $('create').textContent = '建立 Pin';
         $('create').disabled = true;
         setNotice(state.message || '請直接點選 Pin Board 的對應端面。');
       } else if (phase === 'pin') {
-        $('parameters').hidden = true; $('flip').hidden = true; $('other_tail_option').hidden = false; $('create').textContent = '建立 Pin'; $('create').disabled = false;
+        $('create').textContent = '建立 Pin'; $('create').disabled = false;
         setNotice('已取得 Tail 實際輪廓。確認後建立互補 Pin。');
       } else if (phase === 'complete') {
         $('parameters').hidden = true; $('create').textContent = '完成'; $('create').disabled = false;
-        $('flip').hidden = true; $('other_tail_option').hidden = false; setNotice(state.message || 'Tail 與 Pin 已完成。');
+        $('flip').hidden = true; setNotice(state.message || 'Tail 與 Pin 已完成。');
       } else {
         $('parameters').hidden = false; $('flip').hidden = false; $('other_tail_option').hidden = true;
         $('create').textContent = '建立 Tail'; $('create').disabled = !state.metrics;

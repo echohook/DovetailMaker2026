@@ -4,6 +4,50 @@ module DovetailMaker2026
   # V1 uses the profiles saved from the completed Tail cut. This deliberately
   # does not call GeometryCalculator: one source of truth is carried forward.
   class PinCutter
+    def self.match_joint(instance, layouts)
+      raise ArgumentError, 'E004|選取的 Pin Board 已鎖定。' if instance.locked?
+      matches = []
+      layouts.each do |layout|
+        thickness = number(layout.fetch('thickness'))
+        BoardDetector.rectangular_joint_faces(instance, thickness).each do |face|
+          board = BoardDetector.detect(instance, face, thickness)
+          next unless compatible?(board, layout)
+          distance = face.bounds.center.transform(instance.transformation).distance(TailJoints.center(layout))
+          matches << [distance, board, layout]
+        end
+      end
+      if matches.empty?
+        raise ArgumentError, 'E406|找不到與既有 Tail 對應的完整 Pin 端面。請將等厚板材放到 90° 組裝位置，並確認這一端尚未加工。'
+      end
+      match = matches.min_by(&:first)
+      [match[1], match[2]]
+    end
+
+    def self.compatible?(board, layout)
+      tolerance = 0.1.mm
+      return false if (board.width - number(layout.fetch('width'))).abs > tolerance
+      transform = Geom::Transformation.new(numeric_array(layout.fetch('transformation')))
+      tail_x = Geom::Vector3d.new(layout.fetch('x_axis')).transform(transform).normalize
+      tail_z = Geom::Vector3d.new(layout.fetch('z_axis')).transform(transform).normalize
+      pin_x = board.x_axis.transform(board.instance.transformation).normalize
+      pin_y = board.inward_axis.transform(board.instance.transformation).normalize
+      return false unless tail_x.dot(pin_x).abs > 0.999 && tail_z.dot(pin_y).abs > 0.999
+
+      # Test the whole joint volume, not only a projected outline: projection
+      # onto a distant parallel end must never result in a misplaced pocket.
+      width = number(layout.fetch('width'))
+      depth = number(layout.fetch('thickness'))
+      inverse = board.instance.transformation.inverse
+      corners = [0.0, width].product([0.0, depth], [0.0, depth]).map do |x, y, z|
+        delta = tail_point(layout, x, y, z).transform(inverse) - board.origin
+        [delta.dot(board.x_axis), delta.dot(board.inward_axis), delta.dot(board.z_axis)]
+      end
+      [board.width, depth, board.actual_thickness].each_with_index.all? do |extent, axis|
+        values = corners.map { |point| point[axis] }
+        values.min.abs <= tolerance && (values.max - extent).abs <= tolerance
+      end
+    end
+
     def self.read_tail_layout(instance)
       raw = instance.get_attribute(Settings::DICTIONARY, 'tail_layout')
       raw = JSON.parse(raw) if raw.is_a?(String)

@@ -1,0 +1,34 @@
+<!doctype html><meta charset="utf-8"><title>Dialog layout regression</title>
+<style>body{margin:12px;font:13px system-ui;background:#ddd}iframe{width:440px;height:540px;border:0;display:block}nav{margin-bottom:8px}button{margin-right:5px}pre{white-space:pre-wrap;max-width:440px}</style>
+<nav><button data-phase="tail">Tail</button><button data-phase="select_pin">Select Pin</button><button data-phase="resume">Resume</button><button data-phase="pin">Pin</button><button data-phase="complete">Complete</button><button id="about-test">About</button></nav>
+<iframe title="Dovetail dialog"></iframe><pre id="report">Loading…</pre>
+<script>
+const frame=document.querySelector('iframe'), report=document.querySelector('#report');
+const values={thickness:18,tail_count:4,slope:6,left_pin:4,right_pin:7,flipped:false};
+const metrics={width:'517.6 mm',full_pin:'11 mm',tail_width:'118.4 mm',narrow_width:'112.4 mm'};
+function verify(){
+  requestAnimationFrame(()=>{
+    const d=frame.contentDocument, w=frame.contentWindow;
+    const controls=[...d.querySelectorAll('input,select,button')].filter(e=>e.getClientRects().length);
+    const clipped=controls.filter(e=>{const r=e.getBoundingClientRect(); return r.top<0||r.bottom>w.innerHeight||r.left<0||r.right>w.innerWidth});
+    const overflow=d.documentElement.scrollHeight>w.innerHeight||d.documentElement.scrollWidth>w.innerWidth;
+    report.textContent=JSON.stringify({result:!overflow&&!clipped.length?'PASS':'FAIL',viewport:[w.innerWidth,w.innerHeight],content:[d.documentElement.scrollWidth,d.documentElement.scrollHeight],clipped:clipped.map(e=>e.id),visible:controls.map(e=>e.id)},null,2);
+  });
+}
+function state(phase){
+  const w=frame.contentWindow;
+  w.document.getElementById('about_back').click();
+  w.DovetailMaker.receive({phase:phase==='resume'?'select_pin':phase,values,metrics:phase==='tail'?metrics:null,
+    can_create_other_tail:phase!=='resume',other_tail_created:false,
+    message:phase==='resume'?'已讀取既有 Tail。請點選要配合的 Pin 板，會自動對應最近的接合端。':undefined});
+  verify();
+}
+window.fixtureReady=()=>state('tail');
+document.querySelectorAll('[data-phase]').forEach(b=>b.onclick=()=>state(b.dataset.phase));
+document.querySelector('#about-test').onclick=()=>{frame.contentDocument.getElementById('about').click();verify()};
+fetch('../DovetailMaker2026/ui/dialog.html', {cache:'no-store'}).then(r=>r.text()).then(html=>{
+  const base=new URL('../DovetailMaker2026/ui/',location.href).href;
+  const mock=`<base href="${base}"><script>window.sketchup={ready:()=>parent.fixtureReady(),update:()=>{},flip:()=>{},create_tail:()=>{},create_pin:()=>{},finish:()=>{},set_create_other_tail:()=>{}};<\/script>`;
+  frame.srcdoc=html.replace('<head>','<head>'+mock);
+});
+</script>

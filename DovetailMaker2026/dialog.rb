@@ -20,6 +20,7 @@ module DovetailMaker2026
       @dialog.add_action_callback('finish') { |_ctx| @controller.finish }
       @dialog.set_on_closed { @controller.dialog_closed }
       @dialog.show
+      @dialog.set_content_size(440, 540)
     end
 
     def send_state(state)
@@ -34,8 +35,9 @@ module DovetailMaker2026
     private
 
     def dialog_options
-      { dialog_title: 'Dovetail Maker 2026', preferences_key: 'DovetailMaker2026',
-        scrollable: true, resizable: false, width: 380, height: 545,
+      { dialog_title: 'Dovetail Maker 2026', preferences_key: 'DovetailMaker2026.compact.v2',
+        scrollable: false, resizable: true, use_content_size: true,
+        width: 440, height: 540, min_width: 440, min_height: 540,
         style: UI::HtmlDialog::STYLE_DIALOG }
     end
   end
